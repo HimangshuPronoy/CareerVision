@@ -6,35 +6,186 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[]
 
-export type Database = {
+export interface Database {
   public: {
     Tables: {
       profiles: {
         Row: {
-          avatar_url: string | null
-          created_at: string
-          full_name: string | null
           id: string
+          created_at: string
           updated_at: string
           username: string | null
+          full_name: string | null
+          avatar_url: string | null
         }
         Insert: {
-          avatar_url?: string | null
-          created_at?: string
-          full_name?: string | null
           id: string
+          created_at?: string
           updated_at?: string
           username?: string | null
+          full_name?: string | null
+          avatar_url?: string | null
         }
         Update: {
-          avatar_url?: string | null
-          created_at?: string
-          full_name?: string | null
           id?: string
+          created_at?: string
           updated_at?: string
           username?: string | null
+          full_name?: string | null
+          avatar_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profiles_id_fkey"
+            columns: ["id"]
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      stripe_prices: {
+        Row: {
+          id: string
+          product_id: string
+          active: boolean
+          currency: string
+          unit_amount: number
+          interval: string
+          name: string
+          description: string | null
+          features: string[] | null
+          created_at: string
+        }
+        Insert: {
+          id: string
+          product_id: string
+          active?: boolean
+          currency: string
+          unit_amount: number
+          interval: string
+          name: string
+          description?: string | null
+          features?: string[] | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          product_id?: string
+          active?: boolean
+          currency?: string
+          unit_amount?: number
+          interval?: string
+          name?: string
+          description?: string | null
+          features?: string[] | null
+          created_at?: string
         }
         Relationships: []
+      }
+      subscriptions: {
+        Row: {
+          id: string
+          user_id: string
+          status: string
+          price_id: string
+          customer_id: string
+          current_period_end: number
+          cancel_at_period_end: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id: string
+          user_id: string
+          status: string
+          price_id: string
+          customer_id: string
+          current_period_end: number
+          cancel_at_period_end?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          status?: string
+          price_id?: string
+          customer_id?: string
+          current_period_end?: number
+          cancel_at_period_end?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscriptions_user_id_fkey"
+            columns: ["user_id"]
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subscriptions_price_id_fkey"
+            columns: ["price_id"]
+            referencedRelation: "stripe_prices"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      resumes: {
+        Row: {
+          id: string
+          user_id: string
+          name: string
+          email: string | null
+          phone: string | null
+          location: string | null
+          summary: string | null
+          skills: string[] | null
+          education: Json | null
+          experience: Json | null
+          custom_sections: Json | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          name: string
+          email?: string | null
+          phone?: string | null
+          location?: string | null
+          summary?: string | null
+          skills?: string[] | null
+          education?: Json | null
+          experience?: Json | null
+          custom_sections?: Json | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          name?: string
+          email?: string | null
+          phone?: string | null
+          location?: string | null
+          summary?: string | null
+          skills?: string[] | null
+          education?: Json | null
+          experience?: Json | null
+          custom_sections?: Json | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "resumes_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
       }
       saved_insights: {
         Row: {
@@ -98,37 +249,6 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
-      }
-      resumes: {
-        Row: {
-          id: string
-          user_id: string
-          data: Json
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          user_id: string
-          data: Json
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          user_id?: string
-          data?: Json
-          created_at?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "resumes_user_id_fkey"
-            columns: ["user_id"]
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          }
-        ]
       }
     }
     Views: {
