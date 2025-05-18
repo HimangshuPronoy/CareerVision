@@ -1,45 +1,31 @@
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-
-// Set this to true to enable waitlist mode (redirects all protected routes to the waitlist page)
-const APP_IN_WAITLIST = true;
+import { supabase } from '@/integrations/supabase/client';
+import { useQuery } from '@tanstack/react-query';
 
 interface RouteGuardProps {
   children: React.ReactNode;
-  requireAuth?: boolean;
+  requiresSubscription?: boolean;
 }
 
-const RouteGuard: React.FC<RouteGuardProps> = ({ children, requireAuth = true }) => {
-  const { user, loading } = useAuth();
+const RouteGuard: React.FC<RouteGuardProps> = ({ children, requiresSubscription = false }) => {
+  const { user } = useAuth();
   const location = useLocation();
 
-  // While app is in waitlist mode, redirect all attempted access to protected routes to the waitlist page
-  // This check needs to come first before any other checks
-  if (APP_IN_WAITLIST && location.pathname !== '/') {
-    console.log('App in waitlist mode, redirecting to /', location.pathname);
-    return <Navigate to="/" replace />;
-  }
+  // Temporarily bypass subscription check
+  const subscriptionStatus = { status: 'active', current_period_end: new Date(2099, 11, 31) };
+  const isLoading = false;
 
-  if (loading) {
-    // Show loading state while checking authentication
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-careervision-500"></div>
-      </div>
-    );
-  }
-
-  if (requireAuth && !user) {
-    // Redirect to login if authentication is required but user is not logged in
+  if (!user) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  if (!requireAuth && user) {
-    // Redirect to dashboard if user is already logged in and tries to access non-auth pages
-    return <Navigate to="/dashboard" replace />;
+  if (isLoading) {
+    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
   }
 
+  // Always allow access to protected routes
   return <>{children}</>;
 };
 
