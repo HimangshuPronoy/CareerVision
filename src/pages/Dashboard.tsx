@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import DashboardLayout from '@/components/layouts/DashboardLayout';
 import DashboardHeader from '@/components/dashboard/DashboardHeader';
@@ -13,7 +12,9 @@ import { Award, TrendingUp, BarChart2, GraduationCap } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useAIInsights } from '@/hooks/useAIInsights';
+import { useGeminiInsights } from '@/hooks/useGeminiInsights';
 import { toast } from '@/components/ui/use-toast';
+import { useNavigate } from 'react-router-dom';
 
 interface UserProfileType {
   skills?: string[];
@@ -29,6 +30,7 @@ interface UserProfileType {
 const Dashboard = () => {
   const { user } = useAuth();
   const { getSkillRecommendations, getCareerPaths, getUserProfile } = useAIInsights();
+  const { getInsights } = useGeminiInsights();
   const [userName, setUserName] = useState('User');
   const [careerPaths, setCareerPaths] = useState([]);
   const [recommendedSkills, setRecommendedSkills] = useState([]);
@@ -36,8 +38,8 @@ const Dashboard = () => {
   const [skillMatchScore, setSkillMatchScore] = useState(0);
   const [careerOpportunities, setCareerOpportunities] = useState(0);
   const [industryGrowthRate, setIndustryGrowthRate] = useState(0);
-  const [learningProgress, setLearningProgress] = useState(0);
   const [userProfile, setUserProfile] = useState<UserProfileType | null>(null);
+  const navigate = useNavigate();
   
   // Default skill data (will be replaced with real data when available)
   const [skillsData, setSkillsData] = useState([
@@ -62,12 +64,11 @@ const Dashboard = () => {
   ];
 
   // Calculate statistics based on user profile
-  const calculateStats = (userProfile: UserProfileType | null, paths: any[], recommendations: any[]) => {
+  const calculateStats = async (userProfile: UserProfileType | null, paths: any[], recommendations: any[]) => {
     if (!userProfile) {
       setSkillMatchScore(0);
       setCareerOpportunities(0);
       setIndustryGrowthRate(10.5); // Default growth rate
-      setLearningProgress(0);
       return;
     }
 
@@ -87,50 +88,42 @@ const Dashboard = () => {
       setSkillMatchScore(0);
     }
     
-    // Calculate career opportunities based on paths and skills
-    if (paths && paths.length > 0) {
-      // Generate a number based on path matches - more paths with higher match = more opportunities
-      const baseOpportunities = paths.reduce((sum, path) => sum + Math.floor(path.matchPercentage / 10), 0);
-      setCareerOpportunities(baseOpportunities);
-    } else if (hasSkills) {
-      // Estimate based on number of skills
-      setCareerOpportunities(Math.floor(5 + userProfile.skills.length * 3));
+    // Calculate available positions based on skills and industry
+    if (hasSkills) {
+      // Base positions from skills (each skill typically has 5-8 positions)
+      const basePositions = userProfile.skills.length * 6;
+      
+      // Industry multipliers for different sectors
+      const industryMultipliers: { [key: string]: number } = {
+        'Technology': 2.0,
+        'Healthcare': 1.8,
+        'Finance': 1.6,
+        'Education': 1.4,
+        'Manufacturing': 1.3,
+        'Retail': 1.2,
+        'Other': 1.0
+      };
+      
+      // Calculate total positions with industry multiplier
+      const multiplier = industryMultipliers[userProfile.industry || 'Other'];
+      const totalPositions = Math.round(basePositions * multiplier);
+      setCareerOpportunities(totalPositions);
+
+      // Set industry growth rate based on industry
+      const industryGrowthRates: { [key: string]: number } = {
+        'Technology': 15.8,
+        'Healthcare': 14.3,
+        'Finance': 10.5,
+        'Education': 8.2,
+        'Manufacturing': 6.7,
+        'Retail': 5.9,
+        'Other': 7.5
+      };
+      
+      setIndustryGrowthRate(industryGrowthRates[userProfile.industry || 'Other']);
     } else {
       setCareerOpportunities(0);
-    }
-    
-    // Set industry growth rate based on industry if available
-    if (userProfile.industry) {
-      // Different growth rates for different industries
-      const growthRates: { [key: string]: number } = {
-        'Technology': 14.3,
-        'Healthcare': 16.8,
-        'Finance': 8.2,
-        'Education': 7.5,
-        'Manufacturing': 5.1,
-        'Retail': 4.8
-      };
-      setIndustryGrowthRate(growthRates[userProfile.industry] || 10.5);
-    } else {
-      setIndustryGrowthRate(10.5); // Default growth rate
-    }
-    
-    // Fix: Set learning progress based on completed resources or skills
-    // For now, we'll calculate it based on skills and recommendations
-    if (hasSkills) {
-      // Calculate a rough estimate of learning progress
-      // We'll consider each skill as something learned, plus any active recommendations
-      let progress = userProfile.skills.length;
-      
-      // Add a bonus if the user has recommendations they're actively working on
-      if (recommendations && recommendations.length > 0) {
-        // We'll add a partial credit for each recommendation (assuming they're in progress)
-        progress += Math.ceil(recommendations.length / 2);
-      }
-      
-      setLearningProgress(progress);
-    } else {
-      setLearningProgress(0);
+      setIndustryGrowthRate(7.5); // Default growth rate
     }
   };
 
@@ -224,11 +217,16 @@ const Dashboard = () => {
     fetchUserData();
   }, [user, getUserProfile, getCareerPaths, getSkillRecommendations]);
 
+  const handleViewCareerPath = (path: any) => {
+    // Navigate to career paths page with the selected path
+    navigate('/career-paths', { state: { selectedPath: path } });
+  };
+
   return (
     <DashboardLayout>
       <DashboardHeader userName={userName} />
       
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
         <StatsCard 
           title="Skill Match Score" 
           value={`${skillMatchScore}%`} 
@@ -237,11 +235,11 @@ const Dashboard = () => {
           description="Your skills match with market demand"
         />
         <StatsCard 
-          title="Career Opportunities" 
-          value={careerOpportunities.toString()} 
+          title="Available Positions" 
+          value={careerOpportunities.toString() + "+"} 
           change={3} 
           icon={<TrendingUp className="h-5 w-5 text-insight-500" />} 
-          description="Job openings matching your profile"
+          description="Open positions matching your skills"
         />
         <StatsCard 
           title="Industry Growth Rate" 
@@ -249,12 +247,6 @@ const Dashboard = () => {
           change={2.1} 
           icon={<BarChart2 className="h-5 w-5 text-careervision-500" />} 
           description={userProfile?.industry || "Technology"} 
-        />
-        <StatsCard 
-          title="Learning Progress" 
-          value={learningProgress.toString()} 
-          icon={<GraduationCap className="h-5 w-5 text-insight-500" />} 
-          description="Skills acquired or in progress"
         />
       </div>
       
@@ -275,7 +267,8 @@ const Dashboard = () => {
               title={path.title} 
               description={path.description} 
               matchPercentage={path.matchPercentage} 
-              skillsNeeded={path.skillsNeeded} 
+              skillsNeeded={path.skillsNeeded}
+              onViewDetails={() => handleViewCareerPath(path)}
             />
           ))
         ) : (
@@ -284,19 +277,22 @@ const Dashboard = () => {
               title="Add Skills to See Matches" 
               description="Update your skills profile to get personalized career path recommendations." 
               matchPercentage={0} 
-              skillsNeeded={["Update your profile"]} 
+              skillsNeeded={["Update your profile"]}
+              onViewDetails={() => navigate('/profile')}
             />
             <CareerPathCard 
               title="Complete Your Profile" 
               description="Fill in your education, experience, and industry to improve career matching." 
               matchPercentage={0} 
-              skillsNeeded={["Go to Profile"]} 
+              skillsNeeded={["Go to Profile"]}
+              onViewDetails={() => navigate('/profile')}
             />
             <CareerPathCard 
               title="Explore Career Paths" 
               description="Visit the Career Paths page to explore options and test specific job matches." 
               matchPercentage={0} 
-              skillsNeeded={["Visit Career Paths"]} 
+              skillsNeeded={["Visit Career Paths"]}
+              onViewDetails={() => navigate('/career-paths')}
             />
           </>
         )}

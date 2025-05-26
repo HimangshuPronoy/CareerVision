@@ -2,11 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Menu, X } from 'lucide-react';
+import { useUnlock } from '@/contexts/UnlockContext';
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const location = useLocation();
+  const { isUnlocked, remainingTime } = useUnlock();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -26,6 +28,12 @@ const Navbar = () => {
     setIsMenuOpen(false);
   }, [location]);
 
+  const formatRemainingTime = (ms: number) => {
+    const hours = Math.floor(ms / (1000 * 60 * 60));
+    const minutes = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
+    return `${hours}h ${minutes}m`;
+  };
+
   return (
     <nav 
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
@@ -39,31 +47,33 @@ const Navbar = () => {
           <div className="flex items-center">
             <Link to="/" className="flex-shrink-0 flex items-center">
               <span className="text-2xl md:text-3xl font-bold gradient-text">CareerVision</span>
-              <span className="ml-2 px-2 py-0.5 text-xs font-medium bg-careervision-100 text-careervision-800 dark:bg-careervision-900 dark:text-careervision-300 rounded-full">
-                Waitlist
-              </span>
             </Link>
           </div>
           <div className="hidden md:ml-6 md:flex md:items-center md:space-x-6">
             <Link to="/" className="px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-careervision-600 dark:text-gray-300 dark:hover:text-white transition-colors">
               Home
             </Link>
-            <a href="#features" className="px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-careervision-600 dark:text-gray-300 dark:hover:text-white transition-colors">
+            <Link to="/features" className="px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-careervision-600 dark:text-gray-300 dark:hover:text-white transition-colors">
               Features
-            </a>
-            <Link to="/terms" className="px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-careervision-600 dark:text-gray-300 dark:hover:text-white transition-colors">
-              Terms
             </Link>
-            <Link to="/privacy" className="px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-careervision-600 dark:text-gray-300 dark:hover:text-white transition-colors">
-              Privacy
+            <Link to="/pricing" className="px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-careervision-600 dark:text-gray-300 dark:hover:text-white transition-colors">
+              Pricing
+            </Link>
+            <Link to="/about" className="px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-careervision-600 dark:text-gray-300 dark:hover:text-white transition-colors">
+              About
             </Link>
           </div>
           <div className="hidden md:flex items-center space-x-4">
-            <a href="#waitlist">
-              <Button className="rounded-full shadow-md bg-gradient-to-r from-careervision-500 to-insight-500 hover:from-careervision-600 hover:to-insight-600 transition-all duration-300 hover:shadow-lg border-0">
-                Join Waitlist
+            <Link to="/login">
+              <Button variant="ghost" className="rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+                Log In
               </Button>
-            </a>
+            </Link>
+            <Link to="/signup">
+              <Button className="rounded-full shadow-md bg-gradient-to-r from-careervision-500 to-insight-500 hover:from-careervision-600 hover:to-insight-600 transition-all duration-300 hover:shadow-lg border-0">
+                Sign Up
+              </Button>
+            </Link>
           </div>
           <div className="flex items-center md:hidden">
             <button
@@ -77,6 +87,12 @@ const Navbar = () => {
               {isMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
             </button>
           </div>
+          {isUnlocked && remainingTime && (
+            <div className="ml-auto mr-4 text-sm text-muted-foreground">
+              <span className="font-semibold text-green-500">Dev Mode</span>
+              <span className="ml-2">({formatRemainingTime(remainingTime)} remaining)</span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -89,21 +105,24 @@ const Navbar = () => {
             <Link to="/" className="block px-4 py-3 rounded-lg text-base font-medium text-gray-700 hover:text-careervision-600 hover:bg-gray-50 dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-800 transition-colors">
               Home
             </Link>
-            <a href="#features" className="block px-4 py-3 rounded-lg text-base font-medium text-gray-700 hover:text-careervision-600 hover:bg-gray-50 dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-800 transition-colors">
+            <Link to="/features" className="block px-4 py-3 rounded-lg text-base font-medium text-gray-700 hover:text-careervision-600 hover:bg-gray-50 dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-800 transition-colors">
               Features
-            </a>
-            <Link to="/terms" className="block px-4 py-3 rounded-lg text-base font-medium text-gray-700 hover:text-careervision-600 hover:bg-gray-50 dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-800 transition-colors">
-              Terms
             </Link>
-            <Link to="/privacy" className="block px-4 py-3 rounded-lg text-base font-medium text-gray-700 hover:text-careervision-600 hover:bg-gray-50 dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-800 transition-colors">
-              Privacy
+            <Link to="/pricing" className="block px-4 py-3 rounded-lg text-base font-medium text-gray-700 hover:text-careervision-600 hover:bg-gray-50 dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-800 transition-colors">
+              Pricing
+            </Link>
+            <Link to="/about" className="block px-4 py-3 rounded-lg text-base font-medium text-gray-700 hover:text-careervision-600 hover:bg-gray-50 dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-800 transition-colors">
+              About
             </Link>
           </div>
           <div className="pt-4 pb-6 border-t border-gray-200 dark:border-gray-700">
             <div className="px-4 space-y-3">
-              <a href="#waitlist" className="block w-full px-4 py-3 text-center rounded-lg text-base font-medium bg-gradient-to-r from-careervision-500 to-insight-500 text-white hover:from-careervision-600 hover:to-insight-600 shadow-md transition-all duration-300">
-                Join Waitlist
-              </a>
+              <Link to="/login" className="block w-full px-4 py-3 text-center rounded-lg text-base font-medium text-gray-700 hover:text-careervision-600 hover:bg-gray-50 dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-800 transition-colors">
+                Log In
+              </Link>
+              <Link to="/signup" className="block w-full px-4 py-3 text-center rounded-lg text-base font-medium bg-gradient-to-r from-careervision-500 to-insight-500 text-white hover:from-careervision-600 hover:to-insight-600 shadow-md transition-all duration-300">
+                Sign Up
+              </Link>
             </div>
           </div>
         </div>

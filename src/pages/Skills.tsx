@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import DashboardLayout from '@/components/layouts/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -35,9 +34,10 @@ const Skills = () => {
         // Transform skills for the radar chart if we have skills
         if (userProfile.skills && userProfile.skills.length > 0) {
           const formattedSkills = userProfile.skills.slice(0, 6).map(skill => {
-            // Generate a score and demand for visualization
-            const userScore = Math.floor(Math.random() * 40) + 40; // 40-80
-            const marketDemand = Math.floor(Math.random() * 30) + 60; // 60-90
+            // Generate a consistent score based on the skill name
+            const hash = skill.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+            const userScore = 40 + (hash % 40); // 40-80 range
+            const marketDemand = 60 + (hash % 30); // 60-90 range
             return {
               skill,
               userScore,

@@ -18,6 +18,7 @@ import PrivacyPolicy from "./pages/PrivacyPolicy";
 import Settings from "./pages/Settings";
 import ResumeBuilder from "./pages/ResumeBuilder";
 import { AuthProvider } from "./contexts/AuthContext";
+import { UnlockProvider } from "./contexts/UnlockContext";
 import RouteGuard from "./components/RouteGuard";
 
 // Create a client
@@ -28,31 +29,33 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <AuthProvider>
-          <TooltipProvider>
-            <Routes>
-              {/* Public routes */}
-              <Route path="/" element={<Index />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/signup" element={<Signup />} />
-              <Route path="/terms" element={<TermsOfService />} />
-              <Route path="/privacy" element={<PrivacyPolicy />} />
+          <UnlockProvider>
+            <TooltipProvider>
+              <Routes>
+                {/* Public routes */}
+                <Route path="/" element={<Index />} />
+                <Route path="/login" element={<Login />} />
+                <Route path="/signup" element={<Signup />} />
+                <Route path="/terms" element={<TermsOfService />} />
+                <Route path="/privacy" element={<PrivacyPolicy />} />
 
-              {/* Protected routes that require authentication */}
-              <Route path="/dashboard" element={<RouteGuard><Dashboard /></RouteGuard>} />
-              <Route path="/profile" element={<RouteGuard><Profile /></RouteGuard>} />
-              <Route path="/settings" element={<RouteGuard><Settings /></RouteGuard>} />
-              <Route path="/trends" element={<RouteGuard><MarketTrends /></RouteGuard>} />
-              <Route path="/skills" element={<RouteGuard><Skills /></RouteGuard>} />
-              <Route path="/career-paths" element={<RouteGuard><CareerPaths /></RouteGuard>} />
-              <Route path="/resume-builder" element={<RouteGuard><ResumeBuilder /></RouteGuard>} />
+                {/* Protected routes that require authentication */}
+                <Route path="/dashboard" element={<RouteGuard><Dashboard /></RouteGuard>} />
+                <Route path="/profile" element={<RouteGuard><Profile /></RouteGuard>} />
+                <Route path="/settings" element={<RouteGuard><Settings /></RouteGuard>} />
+                <Route path="/trends" element={<RouteGuard><MarketTrends /></RouteGuard>} />
+                <Route path="/skills" element={<RouteGuard><Skills /></RouteGuard>} />
+                <Route path="/career-paths" element={<RouteGuard><CareerPaths /></RouteGuard>} />
+                <Route path="/resume-builder" element={<RouteGuard><ResumeBuilder /></RouteGuard>} />
 
-              {/* 404 route */}
-              <Route path="*" element={<NotFound />} />
-            </Routes>
+                {/* 404 route */}
+                <Route path="*" element={<NotFound />} />
+              </Routes>
 
-            <Toaster />
-            <Sonner />
-          </TooltipProvider>
+              <Toaster />
+              <Sonner />
+            </TooltipProvider>
+          </UnlockProvider>
         </AuthProvider>
       </BrowserRouter>
     </QueryClientProvider>

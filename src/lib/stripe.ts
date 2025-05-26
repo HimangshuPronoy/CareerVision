@@ -1,23 +1,6 @@
-// Price IDs direct from Stripe dashboard
-export const PRICE_IDS = {
-  MONTHLY: 'price_1RJumRJjRarA6eH84kygqd80',
-  YEARLY: 'price_1RJumvJjRarA6eH8KTvJCoGL',
-};
+import { loadStripe } from '@stripe/stripe-js';
+import { supabase } from '@/integrations/supabase/client';
 
-// Constants for subscription plans
-export const PLANS = {
-  FREE: 'free',
-  MONTHLY: 'monthly',
-  YEARLY: 'yearly',
-};
-
-// Subscription prices for display
-export const PRICES = {
-  MONTHLY: 14.99,
-  YEARLY: 129.99,
-  YEARLY_MONTHLY_EQUIVALENT: 10.83, // $129.99 / 12
-};
-
-// Use this to calculate savings for yearly plan
-export const YEARLY_SAVINGS = ((PRICES.MONTHLY * 12) - PRICES.YEARLY).toFixed(2);
-export const YEARLY_SAVINGS_PERCENTAGE = Math.round(((PRICES.MONTHLY * 12) - PRICES.YEARLY) / (PRICES.MONTHLY * 12) * 100); 
+// Make sure to call `loadStripe` outside of a component's render to avoid
+// recreating the `Stripe` object on every render.
+export const stripePromise = loadStripe('pk_live_51RIzYUJjRarA6eH81NR6FNjH0BCkFBoM13yCsXlKrfb1J32ZPpSYJmKt8XV8P1brI51ismmIPZ1Ggr4zeku0f8Vz00ziC9Fplm'); 

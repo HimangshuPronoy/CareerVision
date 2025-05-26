@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
-import { LayoutDashboard, BarChart2, TrendingUp, User, Settings, Award, FileText } from 'lucide-react';
+import { LayoutDashboard, BarChart2, TrendingUp, User, Settings, Award, FileText, CreditCard } from 'lucide-react';
 
 const navItems = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
@@ -9,6 +9,7 @@ const navItems = [
   { name: 'Skills Analysis', href: '/skills', icon: Award },
   { name: 'Resume Builder', href: '/resume-builder', icon: FileText },
   { name: 'Career Paths', href: '/career-paths', icon: TrendingUp },
+  { name: 'Subscription', href: '/subscription', icon: CreditCard },
   { name: 'Profile', href: '/profile', icon: User },
   { name: 'Settings', href: '/settings', icon: Settings },
 ];

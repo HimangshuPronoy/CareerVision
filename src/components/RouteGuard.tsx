@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
-import { useQuery } from '@tanstack/react-query';
+import { useUnlock } from '@/contexts/UnlockContext';
+import { UnlockDialog } from './UnlockDialog';
 
 interface RouteGuardProps {
   children: React.ReactNode;
@@ -11,21 +11,26 @@ interface RouteGuardProps {
 
 const RouteGuard: React.FC<RouteGuardProps> = ({ children, requiresSubscription = false }) => {
   const { user } = useAuth();
+  const { isUnlocked } = useUnlock();
   const location = useLocation();
-
-  // Temporarily bypass subscription check
-  const subscriptionStatus = { status: 'active', current_period_end: new Date(2099, 11, 31) };
-  const isLoading = false;
+  const [showUnlockDialog, setShowUnlockDialog] = useState(!isUnlocked);
 
   if (!user) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  if (isLoading) {
-    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+  if (!isUnlocked) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-background">
+        <UnlockDialog 
+          isOpen={true} 
+          onClose={() => setShowUnlockDialog(false)} 
+          disableClose={true}
+        />
+      </div>
+    );
   }
 
-  // Always allow access to protected routes
   return <>{children}</>;
 };
 

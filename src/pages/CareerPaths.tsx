@@ -7,19 +7,30 @@ import { RefreshCw, Search } from 'lucide-react';
 import CareerPathCard from '@/components/dashboard/CareerPathCard';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
+import { useLocation } from 'react-router-dom';
 
 const CareerPaths = () => {
+  const location = useLocation();
   const { getCareerPaths, getSpecificCareerPath, getUserProfile } = useAIInsights();
   const [careerPaths, setCareerPaths] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [specificJobTitle, setSpecificJobTitle] = useState('');
   const [specificResult, setSpecificResult] = useState(null);
   const [isSearching, setIsSearching] = useState(false);
-  const [selectedPath, setSelectedPath] = useState(null);
+  const [selectedPath, setSelectedPath] = useState(location.state?.selectedPath || null);
 
   useEffect(() => {
     fetchGeneralPaths();
   }, []);
+
+  useEffect(() => {
+    // Handle selected path from dashboard navigation
+    if (location.state?.selectedPath) {
+      setSelectedPath(location.state.selectedPath);
+      // Clear the location state to avoid showing the same path on refresh
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state]);
 
   const fetchGeneralPaths = async () => {
     setIsLoading(true);

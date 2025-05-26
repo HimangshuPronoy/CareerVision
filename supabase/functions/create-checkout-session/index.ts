@@ -1,222 +1,93 @@
-import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
-import { corsHeaders } from '../_shared/cors.ts'
-import Stripe from 'https://esm.sh/stripe@12.6.0?target=deno'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3'
+import Stripe from 'https://esm.sh/stripe@14.21.0'
+
+// Add CORS headers to all responses
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+}
 
 const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') || '', {
-  httpClient: Stripe.createFetchHttpClient(),
   apiVersion: '2023-10-16',
 })
 
-// This is needed to handle CORS preflight requests
-async function handleCors(req: Request): Promise<Response | null> {
+Deno.serve(async (req) => {
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    return new Response(null, { headers: corsHeaders })
   }
-  return null
-}
-
-serve(async (req) => {
-  // Handle CORS
-  const corsResponse = await handleCors(req)
-  if (corsResponse) return corsResponse
 
   try {
-    // Get request body
-    const requestData = await req.json()
-    const { priceId, customerId, customerEmail } = requestData
-    
-    console.log("Request received to create-checkout-session:", JSON.stringify({
-      priceId,
-      customerId: customerId ? `${customerId.substring(0, 4)}...` : 'none',
-      customerEmail: customerEmail || 'none',
-    }))
+    const { priceId, userId, successUrl, cancelUrl } = await req.json()
 
-    // Validate Stripe API key before proceeding
-    if (!Deno.env.get('STRIPE_SECRET_KEY')) {
-      console.error('STRIPE_SECRET_KEY environment variable is not set');
+    if (!priceId || !userId) {
+      console.error('Missing required fields:', { priceId, userId })
       return new Response(
-        JSON.stringify({ 
-          error: 'Stripe configuration error', 
-          details: 'Server configuration error with Stripe API key'
-        }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
+        JSON.stringify({ error: 'Price ID and User ID are required' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
       )
     }
 
-    if (!priceId) {
+    console.log('Creating checkout session for:', { priceId, userId })
+
+    // Create a Supabase client with the auth token
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') || '',
+      Deno.env.get('SUPABASE_ANON_KEY') || '',
+      {
+        global: { headers: { Authorization: req.headers.get('Authorization')! } },
+        auth: { persistSession: false },
+      }
+    )
+
+    // Get user's email from Supabase
+    const { data: { user }, error: userError } = await supabaseClient.auth.admin.getUserById(userId)
+    
+    if (userError || !user) {
+      console.error('Error fetching user:', userError)
       return new Response(
-        JSON.stringify({ error: 'Price ID is required' }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
+        JSON.stringify({ error: 'Error fetching user details', details: userError }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
       )
     }
 
-    // Find or create a Stripe customer based on Supabase user ID
-    let stripeCustomerId: string | undefined;
-    
-    if (customerId) {
-      try {
-        // First, try to find if this user already has a Stripe customer
-        const customerSearch = await stripe.customers.search({
-          query: `metadata['userId']:'${customerId}'`,
-          limit: 1,
-        });
-
-        if (customerSearch.data.length > 0) {
-          // Customer exists, use the Stripe customer ID
-          stripeCustomerId = customerSearch.data[0].id;
-          console.log(`Found existing Stripe customer: ${stripeCustomerId} for user: ${customerId}`);
-          
-          // Verify customer exists and can be retrieved
-          try {
-            await stripe.customers.retrieve(stripeCustomerId);
-          } catch (retrieveError) {
-            console.error(`Error retrieving customer ${stripeCustomerId}:`, retrieveError);
-            // If we can't retrieve it, consider it non-existent and create a new one
-            stripeCustomerId = undefined;
-          }
-        }
-        
-        // If no customer was found or the customer couldn't be retrieved, create a new one
-        if (!stripeCustomerId && customerEmail) {
-          const newCustomer = await stripe.customers.create({
-            email: customerEmail,
-            metadata: {
-              userId: customerId,
-            }
-          });
-          stripeCustomerId = newCustomer.id;
-          console.log(`Created new Stripe customer: ${stripeCustomerId} for user: ${customerId}`);
-        }
-      } catch (err) {
-        console.error('Error handling customer:', err);
-        // If there's any search error, try to create a new customer 
-        if (customerEmail) {
-          try {
-            const newCustomer = await stripe.customers.create({
-              email: customerEmail,
-              metadata: {
-                userId: customerId,
-              }
-            });
-            stripeCustomerId = newCustomer.id;
-            console.log(`Created new Stripe customer (after error): ${stripeCustomerId} for user: ${customerId}`);
-          } catch (createError) {
-            console.error('Error creating customer:', createError);
-            // Continue without customer info, will use customer_email instead
-          }
-        }
-      }
-    }
-    
-    // Determine subscription or one-time payment based on price
-    let mode: 'subscription' | 'payment' = 'subscription'; // Default to subscription
-    
-    try {
-      // Check if the price is a recurring price
-      const price = await stripe.prices.retrieve(priceId);
-      if (!price.recurring) {
-        mode = 'payment';
-      }
-    } catch (error) {
-      console.error('Error checking price:', error);
-      // Default to subscription if we can't check
-    }
-
-    console.log(`Creating Stripe checkout session with mode: ${mode}`);
+    console.log('Found user:', { email: user.email })
 
     // Create Stripe checkout session
-    const sessionParams: Stripe.Checkout.SessionCreateParams = {
-      payment_method_types: ['card'],
+    const session = await stripe.checkout.sessions.create({
+      customer_email: user.email,
       line_items: [
         {
           price: priceId,
           quantity: 1,
         },
       ],
-      mode,
-      // Use absolute URLs to avoid any domain issues
-      success_url: `${Deno.env.get('BASE_URL') || 'https://careervision2-0.vercel.app'}/subscription/success?session_id={CHECKOUT_SESSION_ID}&plan=${priceId === 'price_1RJumRJjRarA6eH84kygqd80' ? 'monthly' : 'yearly'}`,
-      cancel_url: `${Deno.env.get('BASE_URL') || 'https://careervision2-0.vercel.app'}/subscription/cancel`,
-      client_reference_id: customerId,
+      mode: 'subscription',
+      success_url: successUrl || `${req.headers.get('origin')}/subscription/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: cancelUrl || `${req.headers.get('origin')}/subscription/cancel`,
       metadata: {
-        userId: customerId,
+        userId,
       },
-      allow_promotion_codes: true,
-      billing_address_collection: 'auto',
-      expires_at: Math.floor(Date.now() / 1000) + 23 * 60 * 60, // 23 hours from now (within Stripe's 24 hour limit)
-      // Customize Stripe checkout appearance
-      custom_text: {
-        submit: {
-          message: 'Your subscription will begin immediately after payment.',
+      subscription_data: {
+        metadata: {
+          userId,
         },
       },
-      // Add phone number collection
-      phone_number_collection: {
-        enabled: false,
-      },
-      // Override locale
-      locale: 'auto',
-      // Use hosted UI mode instead of embedded to avoid client-side Stripe.js initialization problems
-      ui_mode: 'hosted',
-    };
+      allow_promotion_codes: true,
+    })
 
-    // Add customer-related parameters if we have them
-    if (stripeCustomerId) {
-      sessionParams.customer = stripeCustomerId;
-    } else if (customerEmail) {
-      sessionParams.customer_email = customerEmail;
-    }
-
-    // Add subscription specific parameters
-    if (mode === 'subscription') {
-      sessionParams.subscription_data = {
-        metadata: {
-          userId: customerId,
-        }
-      };
-    } else if (mode === 'payment') {
-      // Only add payment_intent_data for one-time payments, not subscriptions
-      sessionParams.payment_intent_data = {
-        // Help capture payment faster and reduce failures
-        setup_future_usage: 'off_session',
-      };
-    }
-
-    const session = await stripe.checkout.sessions.create(sessionParams);
-
-    console.log(`Checkout session created: ${session.id}`);
+    console.log('Created checkout session:', { sessionId: session.id })
 
     return new Response(
-      JSON.stringify({ 
-        sessionId: session.id,
-        url: session.url
-      }),
-      {
-        status: 200,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
-    );
+      JSON.stringify({ sessionId: session.id }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    )
   } catch (error) {
-    console.error('Error creating checkout session:', error.message);
-    console.error(error.stack);
-    
+    console.error('Error:', error)
     return new Response(
-      JSON.stringify({ 
-        error: error.message,
-        details: error.stack,
-        type: error.type || 'unknown',
-        code: error.code || 'unknown'
-      }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
-    );
+      JSON.stringify({ error: error.message }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+    )
   }
-}); 
+}) 
