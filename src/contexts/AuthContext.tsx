@@ -56,13 +56,55 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signIn = async (email: string, password: string) => {
     try {
       setError(null);
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) throw error;
+      console.log('Attempting to sign in with:', { email });
+      
+      // Try to sign in directly
+      const { data, error } = await supabase.auth.signInWithPassword({ 
+        email, 
+        password
+      });
+      
+      if (error) {
+        console.error('Sign in error:', error);
+        throw error;
+      }
+      
+      if (!data?.user) {
+        throw new Error('No user data received after successful sign in');
+      }
+
+      // After successful sign in, ensure profile exists
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .upsert({
+          id: data.user.id,
+          username: email,
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'id'
+        });
+      
+      if (profileError) {
+        console.error('Error ensuring profile exists:', profileError);
+        // Don't throw here, as the user is already authenticated
+      }
+      
+      console.log('Sign in successful:', { userId: data.user.id });
     } catch (error: any) {
+      console.error('Sign in failed:', error);
       setError(error.message);
+      
+      // Provide more user-friendly error messages
+      let errorMessage = error.message;
+      if (error.message.includes('Invalid login credentials')) {
+        errorMessage = 'The email or password you entered is incorrect. Please try again.';
+      } else if (error.message.includes('Email not confirmed')) {
+        errorMessage = 'Please verify your email address before signing in.';
+      }
+      
       toast({
         title: "Sign in failed",
-        description: error.message,
+        description: errorMessage,
         variant: "destructive",
       });
     }
