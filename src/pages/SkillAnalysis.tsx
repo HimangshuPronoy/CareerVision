@@ -1,7 +1,6 @@
 
 import { useState, useEffect } from 'react';
 import ProtectedRoute from '@/components/ProtectedRoute';
-import Sidebar from '@/components/layout/Sidebar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -213,7 +212,7 @@ const SkillAnalysis = () => {
   return (
     <ProtectedRoute>
       <div className="flex min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100">
-        <Sidebar />
+        
         <main className="flex-1 p-8">
           <div className="max-w-6xl mx-auto space-y-8">
             {/* Header */}

@@ -1,22 +1,33 @@
-
 import { useState, useEffect } from 'react';
 import ProtectedRoute from '@/components/ProtectedRoute';
-import Sidebar from '@/components/layout/Sidebar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { BookOpen, Target, Clock, CheckCircle, PlayCircle, Zap, Sparkles, Award, Star } from 'lucide-react';
+import BadgeWithConfetti from '@/components/BadgeWithConfetti';
+
+interface LearningPath {
+  title: string;
+  description: string;
+  milestones: Array<{ title: string; description: string; duration: string; resources: string[] }>;
+  overview?: string;
+  modules?: Array<{ title: string; description: string; topics: string[]; difficulty: string; duration: string; resources: string[] }>;
+  prerequisites?: string[];
+  tips?: string[];
+}
 
 const LearningPath = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [targetSkill, setTargetSkill] = useState('');
-  const [learningPath, setLearningPath] = useState<any>(null);
+  const [learningPath, setLearningPath] = useState<LearningPath | null>(null);
   const [loading, setLoading] = useState(false);
   const [savedPaths, setSavedPaths] = useState<any[]>([]);
+  const [earnedBadges, setEarnedBadges] = useState<string[]>([]);
 
   const generateLearningPath = async () => {
     if (!targetSkill.trim()) {
@@ -30,59 +41,58 @@ const LearningPath = () => {
 
     setLoading(true);
     try {
-      // Simulate learning path generation for now
-      const mockPath = {
-        overview: `Master ${targetSkill} with this comprehensive learning pathway designed to take you from beginner to advanced level.`,
-        modules: [
-          {
-            title: `Introduction to ${targetSkill}`,
-            description: 'Learn the fundamentals and core concepts',
-            difficulty: 'Beginner',
-            duration: '2-3 weeks',
-            topics: [
-              'Basic concepts and terminology',
-              'Setting up development environment',
-              'First practical examples'
-            ],
-            resources: ['Online Courses', 'Documentation', 'Tutorials']
+      const geminiApiKey = import.meta.env.VITE_GEMINI_API_KEY || '';
+      if (geminiApiKey) {
+        // Use Gemini 2.0 Flash directly if API key is available
+        const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + geminiApiKey, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
           },
-          {
-            title: `Intermediate ${targetSkill}`,
-            description: 'Build practical skills and projects',
-            difficulty: 'Intermediate',
-            duration: '4-6 weeks',
-            topics: [
-              'Advanced concepts and patterns',
-              'Real-world project development',
-              'Best practices and optimization'
-            ],
-            resources: ['Project-based Learning', 'Code Reviews', 'Community Forums']
-          },
-          {
-            title: `Advanced ${targetSkill}`,
-            description: 'Master complex concepts and architectures',
-            difficulty: 'Advanced',
-            duration: '6-8 weeks',
-            topics: [
-              'Complex system design',
-              'Performance optimization',
-              'Industry-level implementations'
-            ],
-            resources: ['Advanced Courses', 'Mentorship', 'Open Source Contributing']
-          }
-        ],
-        prerequisites: ['Basic programming knowledge', 'Problem-solving skills'],
-        tips: `Focus on building projects while learning ${targetSkill}. Practice regularly and don't hesitate to ask for help in community forums.`
-      };
+          body: JSON.stringify({
+            contents: [{
+              parts: [{
+                text: `Create a comprehensive learning path for ${targetSkill}. Format the response as a JSON object with fields: title, description, milestones (array of objects with title, description, duration, resources (array of strings)).`
+              }]
+            }]
+          }),
+        });
 
-      setTimeout(() => {
-        setLearningPath(mockPath);
-        setLoading(false);
+        const data = await response.json();
+        if (data && data.candidates && data.candidates[0].content && data.candidates[0].content.parts) {
+          const textResponse = data.candidates[0].content.parts[0].text;
+          const cleanedResponse = textResponse
+            .replace(/```json\s*/, '')
+            .replace(/```\s*$/, '')
+            .replace(/^[^{]*/, '')
+            .replace(/[^}]*$/, '');
+          const learningData = JSON.parse(cleanedResponse);
+          setLearningPath(learningData);
+          toast({
+            title: 'Learning Path Generated!',
+            description: 'Your personalized learning roadmap is ready.',
+          });
+        } else {
+          throw new Error('Invalid response format from Gemini API');
+        }
+      } else {
+        // Fallback to existing Supabase function if Gemini API key is not available
+        console.warn("Gemini API key not found, falling back to Supabase function.");
+        const { data, error } = await supabase.functions.invoke<LearningPath>('ai-career-assistant', {
+          body: {
+            type: 'learning_path',
+            prompt: `Create a comprehensive learning path for ${targetSkill}`,
+          },
+        });
+
+        if (error) throw error;
+
+        setLearningPath(data);
         toast({
           title: 'Learning Path Generated!',
           description: 'Your personalized learning roadmap is ready.',
         });
-      }, 2000);
+      }
     } catch (error) {
       console.error('Error generating learning path:', error);
       toast({
@@ -90,6 +100,7 @@ const LearningPath = () => {
         description: 'Please try again later.',
         variant: 'destructive',
       });
+    } finally {
       setLoading(false);
     }
   };
@@ -107,11 +118,21 @@ const LearningPath = () => {
     }
   };
 
+  const handleBadgeEarned = (badgeTitle) => {
+    setEarnedBadges(prev => [...prev, badgeTitle]);
+  };
+
+  useEffect(() => {
+    if (learningPath) {
+      setLoading(false);
+    }
+  }, [learningPath]);
+
   return (
     <ProtectedRoute>
       <div className="flex min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100">
-        <Sidebar />
-        <main className="flex-1 p-8">
+        {/* Main Content */}
+        <main className="flex-1 p-8 2xl:pl-72">
           <div className="max-w-6xl mx-auto space-y-8">
             {/* Header */}
             <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-orange-600 via-red-600 to-pink-600 p-8 text-white">
@@ -227,6 +248,7 @@ const LearningPath = () => {
                                     {module.duration}
                                   </Badge>
                                 )}
+                                <BadgeWithConfetti title={module.title} onEarned={handleBadgeEarned} />
                               </div>
                             </div>
 
@@ -295,6 +317,16 @@ const LearningPath = () => {
                   )}
                 </CardContent>
               </Card>
+            )}
+            {earnedBadges.length > 0 && (
+              <div className="mt-6 p-4 bg-green-50 rounded-lg border border-green-200 text-center">
+                <p className="text-green-800 font-medium">You've earned {earnedBadges.length} badge(s)! Share your learning achievements on social media!</p>
+                <div className="mt-2 flex justify-center flex-wrap gap-2">
+                  {earnedBadges.map((badge, index) => (
+                    <Badge key={index} className="bg-green-100 text-green-800">{badge}</Badge>
+                  ))}
+                </div>
+              </div>
             )}
           </div>
         </main>

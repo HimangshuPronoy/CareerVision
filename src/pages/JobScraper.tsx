@@ -114,13 +114,142 @@ const JobScraper = () => {
         }
       };
 
+      // Attempt to fetch real job listings from USAJOBS API (free, no API key required for basic access)
+      // USAJOBS API is for U.S. federal government jobs
+      const query = encodeURIComponent(searchQuery);
+      const loc = encodeURIComponent(location || "");
+      let usajobsUrl = `https://data.usajobs.gov/api/Search?Keyword=${query}&ResultsPerPage=6`;
+      if (loc) {
+        usajobsUrl += `&LocationName=${loc}`;
+      }
+      
+      try {
+        const response = await fetch(usajobsUrl);
+        const jobData = await response.json();
+        if (jobData && jobData.SearchResult && jobData.SearchResult.SearchResultItems && jobData.SearchResult.SearchResultItems.length > 0) {
+          const usaJobs = jobData.SearchResult.SearchResultItems.map((item: { MatchedObjectDescriptor: { PositionTitle: string; OrganizationName: string; PositionLocationDisplay: string; PositionSchedule: Array<{ Name: string }>; PositionRemuneration?: Array<{ MinimumRange: string; MaximumRange: string; RateIntervalCode: string }>; PositionURI?: string; ApplyOnlineUrl?: string; PositionLocation?: Array<{ TeleworkEligible?: boolean }>; PublicationStartDate?: string; UserArea?: { Details?: { Benefits?: string[]; Requirements?: string }; RelevanceRank?: string } }; QualificationSummary?: string; PositionFormattedDescription?: { Content: string } }) => ({
+            title: item.MatchedObjectDescriptor.PositionTitle,
+            company: item.MatchedObjectDescriptor.OrganizationName,
+            location: item.MatchedObjectDescriptor.PositionLocationDisplay,
+            type: item.MatchedObjectDescriptor.PositionSchedule[0]?.Name || 'Full-Time',
+            salary: item.MatchedObjectDescriptor.PositionRemuneration && item.MatchedObjectDescriptor.PositionRemuneration.length > 0 ? `${item.MatchedObjectDescriptor.PositionRemuneration[0].MinimumRange} - ${item.MatchedObjectDescriptor.PositionRemuneration[0].MaximumRange} ${item.MatchedObjectDescriptor.PositionRemuneration[0].RateIntervalCode}` : 'Not specified',
+            description: item.PositionFormattedDescription?.Content || 'No description available',
+            requirements: item.QualificationSummary ? item.QualificationSummary.split('. ').filter(Boolean).map((req: string) => req.trim()) : [],
+            responsibilities: [],
+            url: item.MatchedObjectDescriptor.ApplyOnlineUrl || item.MatchedObjectDescriptor.PositionURI || '#',
+            source: 'USAJOBS (Federal Government)',
+            id: item.MatchedObjectDescriptor.PositionTitle + '-' + Math.random().toString(36).substring(2, 7),
+            experience: item.QualificationSummary || 'Not specified',
+            benefits: item.MatchedObjectDescriptor.UserArea?.Details?.Benefits || [],
+            posted_date: item.MatchedObjectDescriptor.PublicationStartDate || 'Not specified',
+            match_score: item.MatchedObjectDescriptor.UserArea?.RelevanceRank ? parseFloat(item.MatchedObjectDescriptor.UserArea.RelevanceRank) : 0.8,
+            skills_required: item.MatchedObjectDescriptor.UserArea?.Details?.Requirements?.split(', ').filter(Boolean) || [],
+            industry: 'Government',
+            remote_option: item.MatchedObjectDescriptor.PositionLocation?.some(loc => loc.TeleworkEligible) || false,
+            company_size: 'Large (Government)',
+          }));
+          
+          setJobs(usaJobs);
+          toast({
+            title: 'Real Job Listings Found!',
+            description: `Found ${usaJobs.length} U.S. federal government job listings for "${searchQuery}".`
+          });
+          setLoading(false);
+          return; // Exit early since we have real job data
+        } else {
+          console.log("No real job listings from USAJOBS, falling back to other options.");
+          toast({
+            title: 'No Federal Jobs Found',
+            description: `No U.S. federal job listings found for "${searchQuery}". Searching for non-government jobs...`
+          });
+        }
+      } catch (usajobsError) {
+        console.error("Error fetching from USAJOBS API:", usajobsError);
+        toast({
+          title: 'API Error',
+          description: "Failed to fetch real job listings from USAJOBS. Falling back to other options.",
+          variant: 'destructive'
+        });
+      }
+
+      // Attempt to fetch non-government jobs from another free API like Adzuna (requires API key after registration)
+      // IMPORTANT: Store Adzuna API credentials securely as environment variables or in a backend service.
+      // Do not hardcode API keys directly in the code as they can be exposed in frontend applications.
+      const adzunaAppId = import.meta.env.VITE_ADZUNA_APP_ID || ''; // Should be set in .env file as VITE_ADZUNA_APP_ID
+      const adzunaApiKey = import.meta.env.VITE_ADZUNA_API_KEY || ''; // Should be set in .env file as VITE_ADZUNA_API_KEY
+      if (adzunaAppId && adzunaApiKey) {
+        const adzunaQuery = encodeURIComponent(searchQuery);
+        const adzunaLoc = encodeURIComponent(location || '');
+        let adzunaUrl = `https://api.adzuna.com/v1/api/jobs/gb/search/1?app_id=${adzunaAppId}&app_key=${adzunaApiKey}&results_per_page=6&what=${adzunaQuery}`;
+        if (adzunaLoc) {
+          adzunaUrl += `&where=${adzunaLoc}`;
+        }
+        try {
+          const response = await fetch(adzunaUrl);
+          const jobData = await response.json();
+          if (jobData && jobData.results && jobData.results.length > 0) {
+            const adzunaJobs = jobData.results.map((job: { id?: string; title: string; company: { display_name: string }; location: { display_name: string }; contract_type?: string; contract_time?: string; salary_min?: number; salary_max?: number; salary_currency?: string; description: string; redirect_url?: string; created?: string; category?: { label: string }; relevance?: number }) => ({
+              title: job.title,
+              company: job.company.display_name,
+              location: job.location.display_name,
+              type: job.contract_type || job.contract_time || 'Not specified',
+              salary: job.salary_min && job.salary_max ? `${job.salary_min} - ${job.salary_max}${job.salary_currency ? ' ' + job.salary_currency : ''}` : 'Not specified',
+              description: job.description || 'No description available',
+              requirements: [],
+              responsibilities: [],
+              url: job.redirect_url || '#',
+              id: job.id || `adzuna-${job.title}-${Math.random().toString(36).substring(2, 7)}`,
+              experience: job.category?.label || 'Not specified',
+              benefits: [],
+              posted_date: job.created || 'Not specified',
+              match_score: job.relevance || 0.7,
+              skills_required: [],
+              industry: job.category?.label.split('-')[0].trim() || 'Various',
+              remote_option: job.description.toLowerCase().includes('remote') || false,
+              company_size: 'Various',
+              source: 'Adzuna',
+            }));
+            setJobs(adzunaJobs);
+            toast({
+              title: 'Real Non-Government Job Listings Found!',
+              description: `Found ${adzunaJobs.length} job listings for "${searchQuery}".`
+            });
+            setLoading(false);
+            return; // Exit early since we have real job data
+          } else {
+            console.log("No real non-government job listings from Adzuna, falling back to AI simulation.");
+            toast({
+              title: 'No Non-Government Jobs Found',
+              description: `No job listings found for "${searchQuery}" via secondary API. Simulating listings with AI instead.`
+            });
+          }
+        } catch (adzunaError) {
+          console.error("Error fetching from Adzuna API:", adzunaError);
+          toast({
+            title: 'Secondary API Error',
+            description: "Failed to fetch real non-government job listings. Falling back to AI simulation.",
+            variant: 'destructive'
+          });
+        }
+      } else {
+        console.warn("Adzuna API credentials not found in environment variables, skipping Adzuna API call.");
+        toast({
+          title: 'API Credentials Missing',
+          description: "Adzuna API credentials not set. Please configure environment variables for real job data. Falling back to AI simulation.",
+          variant: 'destructive'
+        });
+      }
+
+      // Fallback to AI simulation if all real API attempts fail or return no results
+      // For now, use AI to simulate realistic job listings across various industries:
       const { data, error } = await supabase.functions.invoke('ai-career-assistant', {
         body: {
-          message: `Generate 6 realistic job listings for: "${searchQuery}" in "${location || 'Remote'}" with the following preferences: ${JSON.stringify(filters)}. Include detailed job descriptions, requirements, benefits, and realistic salary information. Make them diverse and relevant to current market trends.`,
+          message: `Generate 6 highly realistic job listings for: "${searchQuery}" in "${location || 'Remote'}" with the following preferences: ${JSON.stringify(filters)}. Include detailed job descriptions, requirements, benefits, and realistic salary information based on current market data. Ensure diversity across different industries (technology, healthcare, finance, education, retail, etc.) and company types (startups, mid-size, large corporations). Make them relevant to current industry trends. Format the response as a JSON array of objects with fields: id, title, company, location, salary, type, experience, description, requirements (array), benefits (array), posted_date, match_score (number), skills_required (array), industry, remote_option (boolean), company_size, application_url (optional), ai_generated (true).`,
           context: {
             type: 'job_scraping',
             user_preferences: requestPayload
-          }
+          },
+          model: 'mistralai/mistral-7b-instruct:free' // Using Mistral 7B Instruct as an alternative free model from OpenRouter for improved simulation
         }
       });
 
@@ -140,8 +269,8 @@ const JobScraper = () => {
           const jobsData = JSON.parse(cleanedResponse);
           const jobsArray = Array.isArray(jobsData) ? jobsData : jobsData.jobs || [];
           
-          const processedJobs = jobsArray.map((job: any, index: number) => ({
-            id: `ai-job-${Date.now()}-${index}`,
+          const processedJobs = jobsArray.map((job: { title: string; company: string; location: string; salary: string; type: string; experience: string; description: string; requirements: string[]; benefits: string[]; posted_date: string; match_score: number; skills_required: string[]; industry: string; remote_option: boolean; company_size: string; application_url?: string }) => ({
+            id: `ai-job-${Date.now()}-${job.title}`,
             title: job.title || 'Software Engineer',
             company: job.company || 'TechCorp',
             location: job.location || location || 'Remote',
