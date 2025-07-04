@@ -1,4 +1,4 @@
-# Welcome to your Lovable project
+# Welcome to your Career Vision project
 
 ## Project info
 
@@ -8,11 +8,7 @@
 
 There are several ways of editing your application.
 
-**Use Lovable**
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/5c432d8a-1f8f-43c4-b213-35ebac2d0927) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
 
 **Use your preferred IDE**
 
